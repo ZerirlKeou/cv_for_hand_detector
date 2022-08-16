@@ -1,0 +1,45 @@
+import cv2 as cv
+import mediapipe as mp
+import time
+
+wCam,hCam = 640,480
+
+video = 'http://admin:admin@192.168.3.110:8081'
+capture = cv.VideoCapture(video)
+capture.set(3,wCam)
+capture.set(4,hCam)
+pTime = 0
+
+mpHands = mp.solutions.hands
+hands = mpHands.Hands()
+mpDraw = mp.solutions.drawing_utils
+
+
+
+
+while True:
+    sucess,img = capture.read()
+
+    cTime = time.time()
+    fps = 1/(cTime-pTime)
+    pTime = cTime
+    cv.putText(img,f'FPS:{int(fps)}',(200,35),cv.FONT_HERSHEY_COMPLEX,1,(255,168,98),3)
+
+    imgRGB = cv.cvtColor(img,cv.COLOR_BGR2RGB)
+    results = hands.process(imgRGB)
+
+    if results.multi_hand_landmarks:
+        for handLms in results.multi_hand_landmarks:
+            for id,lm in enumerate(handLms.landmark):
+                #print(id,lm)
+                h,w,c = img.shape
+                cx,cy = int(lm.x*w),int(lm.y*h)
+                #print(id,cx,cy)
+
+                    
+            mpDraw.draw_landmarks(img,handLms,mpHands.HAND_CONNECTIONS)
+            
+            
+    
+    cv.imshow('Img',img)
+    cv.waitKey(20)
