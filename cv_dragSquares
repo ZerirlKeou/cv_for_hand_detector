@@ -1,0 +1,119 @@
+import cv2
+import numpy as np
+import math
+#mediapipe的相关参数，在官网上面复制
+import mediapipe as mp
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_hands = mp.solutions.hands
+#获取手的21个关节，官网开源
+hands = mp_hands.Hands(
+    model_complexity=0,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5)
+#获取摄像头的视频流
+cap =cv2.VideoCapture(r'http://admin:admin@192.168.3.110:8081')
+ 
+#获取画面宽度,高度，因为显示小数的原因是由于,官网原本除以了宽度
+width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+#方块的相关参数
+square_x = 100
+square_y = 100
+square_width = 100
+square_color = (255,0,0)
+ 
+L1=0
+L2=0
+on_square = False #用于判断是否在方块上，一开始默认不在
+while True:
+    #读取每一帧
+    ret,frame =cap.read()
+    #对图像进行处理
+    #镜像处理，对y轴进行翻转
+ 
+    #mediapipe处理颜色,在官网找
+    frame.flags.writeable =False
+    frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+    results=hands.process(frame)
+ 
+    frame.flags.writeable =True
+    frame = cv2.cvtColor(frame,cv2.COLOR_RGB2BGR)
+ 
+    if results.multi_hand_landmarks: #判断是否有手
+    #不断的解析遍历每一双手，并且最大为两双手
+      for hand_landmarks in results.multi_hand_landmarks:
+          #绘制21个关键点，先对一双手进行解析，然后在对另一双进行解析
+        mp_drawing.draw_landmarks(
+            frame,
+            hand_landmarks,
+            mp_hands.HAND_CONNECTIONS,
+            mp_drawing_styles.get_default_hand_landmarks_style(),
+            mp_drawing_styles.get_default_hand_connections_style()
+            )
+        #保存21个x,y的坐标
+        x_list = []
+        y_list = []    
+        for landmark in hand_landmarks.landmark:#会循环21次把手的关节弄好
+        #添加x坐标
+            x_list.append(landmark.x)#append表示添加x坐标
+        #添加y坐标
+            y_list.append(landmark.y)
+        #获取食指指尖,xy坐标
+        index_finger_x = int(x_list[8] * width)    
+        index_finger_y = int(y_list[8] * height)
+        #获取中指指尖，用于退出方块
+        middle_finger_x = int(x_list[12] * width)    
+        middle_finger_y = int(y_list[12] * height)
+        #计算食指指尖和中指指尖的距离，用勾股定理
+        finger_len = math.hypot((index_finger_x-middle_finger_x), 
+        (index_finger_y-middle_finger_y))
+        #画一个圆来验证坐标是否正确
+        #cv2.circle(frame,(index_finger_x,index_finger_y),20,(255,
+        #0,255),-1)
+        #print(index_finger_x,index_finger_y) 
+        # print(landmark.x)#看看landmark的是什么样子,我只需要食指
+        # print(hand_landmarks)
+        #打印看看21个关键点长什么样子
+        #为x,y,z三个手指的参数位置
+        #如果小于30激活方块，否则不激活
+        if finger_len < 30:
+        #判断指尖是否在方块上面
+           if (index_finger_x > square_x) and (index_finger_x <
+           (square_x+square_width)) and (index_finger_y >
+           square_y) and (index_finger_y < (square_y
+           +square_width)):
+               if on_square ==False:
+                    print('在方块上')
+                    L1=abs(index_finger_x - square_x)#abs代表绝对值
+                    L2=abs(index_finger_y - square_y) 
+                    on_square =True
+                    square_color=(255,0,255)
+               else:
+                  # print('不在方块上')
+                  pass
+        else:
+            on_square =False
+            square_color=(255,0,0)
+ 
+        if on_square: #如果手指在方块上面        
+            square_x = index_finger_x -L1#根据算法
+            square_y = index_finger_y -L2
+    #画一个方块,只需要左上角的点，其他的由长宽高来控制
+    #cv2.rectangle(frame,(square_x,square_y),(square_x
+    #+square_width,square_y+square_width),(255,0,0),-1)
+    #要使用半透明的方块，可以看手指
+    overlay = frame.copy() #给他一个遮罩
+    cv2.rectangle(frame,(square_x,square_y),(square_x
+    +square_width,square_y+square_width),square_color,-1)
+    frame = cv2.addWeighted(overlay,0.5,frame,0.5,0)#做一个半透明
+ 
+ 
+ 
+    #显示图像
+    cv2.imshow('Virtual drag',frame)
+    #退出条件
+    if cv2.waitKey(10) & 0xFF == 27:
+        break
+cap.release()
+cv2.destroyAllWindows()
