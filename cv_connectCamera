@@ -1,0 +1,34 @@
+import cv2 as cv
+import time
+import mediapipe as mp
+import numpy as np
+
+video = 'http://admin:admin@192.168.3.110:8081'
+capture = cv.VideoCapture(video)
+
+if capture.isOpened():
+    cv.namedWindow('camera',cv.WINDOW_NORMAL)
+    fourcc = cv.VideoWriter_fourcc('m','p','4','v')
+    fps = 30
+    size = (int(capture.get(cv.CAP_PROP_FRAME_WIDTH)),int(capture.get(cv.CAP_PROP_FRAME_HEIGHT)))
+    out = cv.VideoWriter()
+    out.open('output.mp4',fourcc,fps,size,True)
+
+    while capture.isOpened():
+        ret,frame = capture.read()
+        if ret:
+            cv.imshow('camera',frame)
+            out.write(frame)
+
+            key = cv.waitKey(10)
+            if key == 27:
+                break
+            if key == ord(' '):
+                photoname = str(int(time.time()))+'.jpg'
+                cv.inwrite(photoname,frame)
+        else:
+            break;
+
+    capture.release()
+    out.release()
+    cv.destroyAllWindows()
