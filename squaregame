@@ -1,0 +1,109 @@
+import itertools
+import cv2
+from cvzone.HandTrackingModule import HandDetector
+import cvzone
+import numpy as np
+from itertools import combinations
+
+cap = cv2.VideoCapture(0)
+# 放大图像显示尺寸
+cap.set(3, 1280)
+cap.set(4, 720)
+
+detector = HandDetector(detectionCon=1)
+colorR = (255,0,255)
+
+def Iou(box1, box2, wh=False):
+    if wh == False:
+        xmin1, ymin1, xmax1, ymax1 = box1
+        xmin2, ymin2, xmax2, ymax2 = box2
+    else:
+        xmin1, ymin1 = int(box1[0] - box1[2] / 2.0), int(box1[1] - box1[3] / 2.0)
+        xmax1, ymax1 = int(box1[0] + box1[2] / 2.0), int(box1[1] + box1[3] / 2.0)
+        xmin2, ymin2 = int(box2[0] - box2[2] / 2.0), int(box2[1] - box2[3] / 2.0)
+        xmax2, ymax2 = int(box2[0] + box2[2] / 2.0), int(box2[1] + box2[3] / 2.0)
+
+    # 获取矩形框交集对应的左上角和右下角的坐标
+    xx1 = np.max([xmin1, xmin2])
+    yy1 = np.max([ymin1, ymin2])
+    xx2 = np.min([xmax1, xmax2])
+    yy2 = np.min([ymax1, ymax2])
+
+    # 计算两个矩形框面积
+    area1 = (xmax1 - xmin1) * (ymax1 - ymin1)
+    area2 = (xmax2 - xmin2) * (ymax2 - ymin2)
+
+    # 计算交集面积
+    inter_area = (np.max([0, xx2 - xx1])) * (np.max([0, yy2 - yy1]))
+
+    # 计算交并比
+    iou = inter_area / (area1 + area2 - inter_area + 1e-6)
+
+    return iou
+
+# 创建拖动矩形的类
+class DragRect():
+    def __init__(self, posCenter, size=[200,200]):
+        self.posCenter = posCenter
+        self.size = size
+    # 更新矩形位置的方法
+    def update(self,cursor):
+        cx, cy = self.posCenter
+        w, h = self.size
+
+        # 如果手指点击了矩形，则更新矩形的位置
+        if cx - w // 2 < cursor[0] < cx + w // 2 and cy - h // 2 < cursor[1] < cy + h // 2:
+            self.posCenter = cursor
+# 画了2个矩形
+rectList = []
+for x in range(5):
+    rectList.append(DragRect([x*250+150, 150]))
+
+while True:
+    success, img = cap.read()
+    img = cv2.flip(img, 1)
+    img = detector.findHands(img)
+    lmList,bboxInfo = detector.findPosition(img)
+
+    if lmList:
+        # 获取食指和中指指尖的距离返回值给l
+        l, _, _ = detector.findDistance(8, 12, img, draw=False)
+        # 距离小于30则视为点击
+        if l < 30:
+            cursor = lmList[8]
+            # 遍历矩形的列表
+            for rect in rectList:
+                rect.update(cursor)
+                cx, cy = rect.posCenter
+                w, h = rect.size
+            #计算不同矩形之间的iou
+            list2 = itertools.combinations(rectList, 2)
+            for cb in list2:
+                cx1, cy1 = cb[0].posCenter
+                w1, h1 = cb[0].size
+                cx2, cy2 = cb[1].posCenter
+                w2, h2 = cb[1].size
+
+                iou = Iou((cx1-w1//2, cy1-h1//2, cx1+w1//2, cy1+h1//2),
+                              (cx2-w2//2, cy2-h2//2, cx2+w2//2, cy2+h2//2))
+                print(iou)
+                if iou > 0.1:
+                    #这里要写擦除画线并且换成另外一个图形的方法
+                    #这个案例有个问题就是系统中两个矩形相交iou=0.1左右就自动消除了一个
+                    #并不是以iou为标准，是cv的一个bug，导致无法自定义iou
+                    #先写好了大体框架，只有这里需要完善一下
+                    cv2.rectangle(img,(abs(abs(cx1-cx2)-abs(w1-w2))//2, abs(abs(cy1-cy2)-abs(h1-h2))//2),
+                                  (abs(abs(cx1-cx2)+abs(w1-w2))//2, abs(abs(cy1-cy2)+abs(h1-h2))//2), colorR, cv2.FILLED)
+
+
+    for rect in rectList:
+        cx, cy = rect.posCenter
+        w, h = rect.size
+        cv2.rectangle(img, (cx - w // 2, cy - h // 2),
+                      (cx + w // 2, cy + h // 2), colorR, cv2.FILLED)
+
+        cvzone.cornerRect(img, (cx - w // 2, cy - h // 2, w, h), 20, rt=0)
+
+
+    cv2.imshow("Image", img)
+    cv2.waitKey(1)
