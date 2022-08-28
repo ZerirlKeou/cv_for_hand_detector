@@ -1,0 +1,249 @@
+# 先修改主函数中图片文件夹的路径
+
+import itertools
+import os
+import cv2
+import cvzone
+import numpy as np
+import pandas as pd
+from cvzone.HandTrackingModule import HandDetector
+
+
+# 计算IOU
+def Iou(box1, box2, wh=False):
+    if wh == False:
+        xmin1, ymin1, xmax1, ymax1 = box1
+        xmin2, ymin2, xmax2, ymax2 = box2
+    else:
+        xmin1, ymin1 = int(box1[0] - box1[2] / 2.0), int(box1[1] - box1[3] / 2.0)
+        xmax1, ymax1 = int(box1[0] + box1[2] / 2.0), int(box1[1] + box1[3] / 2.0)
+        xmin2, ymin2 = int(box2[0] - box2[2] / 2.0), int(box2[1] - box2[3] / 2.0)
+        xmax2, ymax2 = int(box2[0] + box2[2] / 2.0), int(box2[1] + box2[3] / 2.0)
+
+    # 获取矩形框交集对应的左上角和右下角的坐标
+    xx1 = np.max([xmin1, xmin2])
+    yy1 = np.max([ymin1, ymin2])
+    xx2 = np.min([xmax1, xmax2])
+    yy2 = np.min([ymax1, ymax2])
+
+    # 计算两个矩形框面积
+    area1 = (xmax1 - xmin1) * (ymax1 - ymin1)
+    area2 = (xmax2 - xmin2) * (ymax2 - ymin2)
+
+    # 计算交集面积
+    inter_area = (np.max([0, xx2 - xx1])) * (np.max([0, yy2 - yy1]))
+
+    # 计算交并比
+    iou = inter_area / (area1 + area2 - inter_area + 1e-6)
+
+    return iou
+
+
+# 创建读取图像初始化的类
+class DragImg():
+    def __init__(self, path, posOrigin, imgType):
+        self.posOrigin = posOrigin
+        self.imgType = imgType
+        self.path = path
+
+        if self.imgType == 'png':
+            self.img = cv2.imread(self.path, cv2.IMREAD_UNCHANGED)
+        else:
+            self.img = cv2.imread(self.path)
+
+        self.size = self.img.shape[:2]
+
+    def updatepos(self, cursor):
+        ox, oy = self.posOrigin
+        h, w = self.size
+        # 判断是否在图片区域内
+        if ox < cursor[0] < ox + w and oy < cursor[1] < oy + h:
+            self.posOrigin = cursor[0] - w // 2, cursor[1] - h // 2
+
+
+# 更新图片方法（未完成）想试试放到dragimg类里面 给出一个方法类似更新坐标
+# def updateimg(origin_img, altered_img):
+#     try:
+#         h, w = altered_img.size
+#         ox, oy = altered_img.posOrigin
+#         if altered_img.imgType == "png":
+#             img = cvzone.overlayPNG(img, altered_img.img, [ox, oy])
+#         else:
+#             img[ox:oy + h, ox:ox + w] = altered_img.img
+#     except:
+#         pass
+
+
+# 初始化第一步简单零件
+# 返回值为每张图片按顺序的Dragimg方法的列表，每张图片初始位置的列表
+def first_parter():
+    listImg = []
+    first_img_pos_list = []
+    for x, pathImg in enumerate(myList):
+        if 'png' in pathImg:
+            imgType = 'png'
+        else:
+            imgType = 'jpg'
+        listImg.append(DragImg(f'{path}/{pathImg}', [50 + x * 300, 50], imgType))
+        # 初始位置先用dragimg中的方法，后期可把上下这两句初始位置方法统一为一个函数,替换这两个部分{[50 + x * 300, 50]}{listImg[x].posOrigin}
+        first_img_pos_list.append(listImg[x].posOrigin)
+    return listImg, first_img_pos_list
+
+
+# 读取图片合成值
+# 传入要计算的图片序号
+# 返回可以合成其他图片的列表（DragImg类的方法返回）
+def read_img(i):
+    file = pd.read_csv("IMGid.csv")
+    df = pd.DataFrame(file)
+    # print(df)
+    docu = df[i:i + 1]
+    # print(docu)
+    change_img = []
+    for x in range(0, 2, 1):
+        if str(docu['Img_id' + str(x)][i]) != str(0):
+            # print(docu['Img_id' + str(x)][i])
+            # print(f'{path}\\{str(docu["""Img_id0"""][i]) + ".png"}')
+            change_img.append(DragImg(f'{path}\\{str(docu["""Img_id0"""][i]) + ".png"}', [350, 100], "png"))
+    return change_img
+
+
+# 获取目前显示图片的所有坐标
+# 返回值为坐标的列表
+def img_position():
+    imglist = []
+    for x in range():
+        imglist.append()
+    return imglist
+
+
+def loop_update():
+    while True:
+        success, img = cap.read()
+        img = cv2.flip(img, 1)
+        hands, img = detector.findHands(img, flipType=False)
+
+        if hands:
+            lmList = hands[0]['lmList']
+            # 判断是否点击
+            cursor = lmList[8]
+            length, info, img = detector.findDistance(lmList[8], lmList[12], img)
+            if length < 60:
+                cursor = lmList[8]
+                # 更新坐标
+                for imgs in first_parter()[0]:
+                    imgs.updatepos(cursor)
+                # 计算不同图片之间的iou
+                list2 = itertools.combinations(first_parter()[0], 2)
+                for cb in list2:
+                    cx1, cy1 = cb[0].posOrigin
+                    w1, h1 = cb[0].size
+                    cx2, cy2 = cb[1].posOrigin
+                    w2, h2 = cb[1].size
+
+                    iou = Iou((cx1 - w1 // 2, cy1 - h1 // 2, cx1 + w1 // 2, cy1 + h1 // 2),
+                              (cx2 - w2 // 2, cy2 - h2 // 2, cx2 + w2 // 2, cy2 + h2 // 2))
+                    # 这里报错 我的想法是这里返回被检测iou图片的id值（1.png，2.png中返回1，2）输入到read_img方法中返回目标图片的dragimg类的列表
+                    # 可能使用正则表达式会好一点？
+                    pos = list2.index(cb)
+                    print(pos)
+                    # if iou < 0.7:
+                    #     # 检查该图片可合成的目标图片
+                    #     change_img = read_img(pos)
+                    #     if change_img != None:
+                    #         # 更新图片方法？写的不大对
+                    #         try:
+                    #             for imgObject in change_img:
+                    #                 h, w = imgObject.size
+                    #                 ox, oy = imgObject.posOrigin
+                    #                 if imgObject.imgType == "png":
+                    #                     img = cvzone.overlayPNG(img, imgObject.img, [ox, oy])
+                    #                 else:
+                    #                     img[ox:oy + h, ox:ox + w] = imgObject.img
+                    #         except:
+                    #             pass
+        # 显示初始化基础零件图片
+        # 图片尺寸我没改 后面几张图片尺寸太大所以只显示了前两张
+        try:
+            for imgObject in first_parter()[0]:
+
+                h, w = imgObject.size
+                ox, oy = imgObject.posOrigin
+                if imgObject.imgType == "png":
+                    img = cvzone.overlayPNG(img, imgObject.img, [ox, oy])
+                else:
+                    img[ox:oy + h, ox:ox + w] = imgObject.img
+        except:
+            pass
+
+        # try:
+        #     for imgObject in change_img:
+        #
+        #         h, w = imgObject.size
+        #         ox, oy = imgObject.posOrigin
+        #         if imgObject.imgType == "png":
+        #             img = cvzone.overlayPNG(img, imgObject.img, [ox, oy])
+        #         else:
+        #             img[ox:oy + h, ox:ox + w] = imgObject.img
+        # except:
+        #     pass
+        cv2.imshow("Image", img)
+
+        cv2.waitKey(1)
+
+
+if __name__ == '__main__':
+    cap = cv2.VideoCapture(0)
+    cap.set(3, 1280)
+    cap.set(4, 720)
+    # 放置所有图片的路径
+    detector = HandDetector(detectionCon=1)
+    path = "C:\\Users\\15402\\Downloads\\imgmix"
+    myList = os.listdir(path)
+    first_parter()
+    loop_update()
+
+"""
+
+with open(pathCSV, newline='\n') as f:
+    reader = csv.reader(f)
+    dataAll = list(reader)[1:]
+
+btmList = []
+for q in dataAll:
+    btmList.append(IMGid(q))
+
+pageNo = 0
+pageTotal = len(dataAll)
+
+while True:
+    success, img = cap.read()
+    img = cv2.flip(img, 1)
+    hands, img = detector.findHands(img, flipType=False)
+
+    if pageNo < pageTotal:
+        btm = btmList[0]
+        img, bbox = cvzone.putTextRect(img, btm.bottom1, [100, 100], 2, 2, offset=50, border=5)
+
+        if hands:
+            lmList = hands[0]['lmList']
+            cursor = lmList[8]
+            length, info = detector.findDistance(lmList[8], lmList[12])
+            if length < 60:
+                btm.update(cursor, bbox)
+                if btm.userAns is not None:
+                    time.sleep(0.3)
+                    pageNo += 1
+    else:
+        for btm in btmList:
+            if btm.answer == btm.userAns:
+                score += 1
+
+    barValue = 150 + (950 // pageTotal) * pageNo
+    cv2.rectangle(img, (150, 600), (barValue, 650), (0, 255, 0), cv2.FILLED)
+    cv2.rectangle(img, (150, 600), (1100, 650), (255, 0, 255), 5)
+    img, _ = cvzone.putTextRect(img, f'{round(pageNo / pageTotal) * 100}%', [1130, 635], 2, 2, offset=16)
+
+    cv2.imshow("Img", img)
+    cv2.waitKey(1)
+"""
