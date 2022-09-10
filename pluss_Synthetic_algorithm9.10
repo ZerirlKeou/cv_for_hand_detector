@@ -1,12 +1,13 @@
-# 先修改主函数中图片文件夹的路径
+# 先修改配置文件yaml中图片文件夹的路径
 
-import itertools
+from itertools import combinations
 import os
 import cv2
 import cvzone
 import numpy as np
 import pandas as pd
 from cvzone.HandTrackingModule import HandDetector
+import yaml
 
 
 # 计算IOU
@@ -19,7 +20,7 @@ def Iou(box1, box2, wh=False):
         xmax1, ymax1 = int(box1[0] + box1[2] / 2.0), int(box1[1] + box1[3] / 2.0)
         xmin2, ymin2 = int(box2[0] - box2[2] / 2.0), int(box2[1] - box2[3] / 2.0)
         xmax2, ymax2 = int(box2[0] + box2[2] / 2.0), int(box2[1] + box2[3] / 2.0)
-
+    # float
     # 获取矩形框交集对应的左上角和右下角的坐标
     xx1 = np.max([xmin1, xmin2])
     yy1 = np.max([ymin1, ymin2])
@@ -37,6 +38,11 @@ def Iou(box1, box2, wh=False):
     iou = inter_area / (area1 + area2 - inter_area + 1e-6)
 
     return iou
+
+# 元组转化为列表方法
+class tuple_transto_list():
+    def __init__(self, tuple):
+        self.list = list(tuple)
 
 
 # 创建读取图像初始化的类
@@ -84,7 +90,7 @@ def first_parter():
             imgType = 'png'
         else:
             imgType = 'jpg'
-        listImg.append(DragImg(f'{path}/{pathImg}', [50 + x * 300, 50], imgType))
+        listImg.append(DragImg(f'{data["path"][0]["img_path"]}/{pathImg}', [50 + x * 300, 50], imgType))
         # 初始位置先用dragimg中的方法，后期可把上下这两句初始位置方法统一为一个函数,替换这两个部分{[50 + x * 300, 50]}{listImg[x].posOrigin}
         first_img_pos_list.append(listImg[x].posOrigin)
     return listImg, first_img_pos_list
@@ -104,17 +110,18 @@ def read_img(i):
         if str(docu['Img_id' + str(x)][i]) != str(0):
             # print(docu['Img_id' + str(x)][i])
             # print(f'{path}\\{str(docu["""Img_id0"""][i]) + ".png"}')
-            change_img.append(DragImg(f'{path}\\{str(docu["""Img_id0"""][i]) + ".png"}', [350, 100], "png"))
+            change_img.append(
+                DragImg(f'{data["path"][0]["img_path"]}\\{str(docu["""Img_id0"""][i]) + ".png"}', [350, 100], "png"))
     return change_img
 
 
 # 获取目前显示图片的所有坐标
 # 返回值为坐标的列表
-def img_position():
-    imglist = []
-    for x in range():
-        imglist.append()
-    return imglist
+# def img_position():
+#     imglist = []
+#     for x in range():
+#         imglist.append()
+#     return imglist
 
 
 def loop_update():
@@ -134,7 +141,8 @@ def loop_update():
                 for imgs in first_parter()[0]:
                     imgs.updatepos(cursor)
                 # 计算不同图片之间的iou
-                list2 = itertools.combinations(first_parter()[0], 2)
+                print(first_parter()[1])
+                list2 = list(combinations(first_parter()[0], 2))
                 for cb in list2:
                     cx1, cy1 = cb[0].posOrigin
                     w1, h1 = cb[0].size
@@ -145,7 +153,13 @@ def loop_update():
                               (cx2 - w2 // 2, cy2 - h2 // 2, cx2 + w2 // 2, cy2 + h2 // 2))
                     # 这里报错 我的想法是这里返回被检测iou图片的id值（1.png，2.png中返回1，2）输入到read_img方法中返回目标图片的dragimg类的列表
                     # 可能使用正则表达式会好一点？
-                    pos = list2.index(cb)
+                    print(type(list2))
+                    print(dir(list2))
+                    print(type(cb))
+                    print(dir(cb))
+                    print(cb)
+                    cb_after = list(cb)
+                    pos = list2.index(cb_after)
                     print(pos)
                     # if iou < 0.7:
                     #     # 检查该图片可合成的目标图片
@@ -193,13 +207,16 @@ def loop_update():
 
 
 if __name__ == '__main__':
+    # 读取配置文件
+    with open("enviro.yaml", encoding="utf-8") as yaml_file:
+        data = yaml.safe_load(yaml_file)
+    print(data['settings'][2]['width'])
     cap = cv2.VideoCapture(0)
-    cap.set(3, 1280)
-    cap.set(4, 720)
-    # 放置所有图片的路径
+    cap.set(data['settings'][0]['id3'], data['settings'][2]['width'])
+    cap.set(data['settings'][1]['id4'], data['settings'][3]['high'])
     detector = HandDetector(detectionCon=1)
-    path = "C:\\Users\\15402\\Downloads\\imgmix"
-    myList = os.listdir(path)
+    # path = "C:\\Users\\15402\\Downloads\\imgmix"
+    myList = os.listdir(data['path'][0]['img_path'])
     first_parter()
     loop_update()
 
