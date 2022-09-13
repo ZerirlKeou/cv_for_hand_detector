@@ -1,7 +1,21 @@
-path:
-  - img_path : "C:\\Users\\15402\\Downloads\\imgmix"
 settings:
   - id3 : 3
   - id4 : 4
-  - width : 1280
-  - high : 720
+  - width : 1920
+  - height : 720
+hands:
+  - max_num : 1
+  - confidence : 0.8
+server_data:
+  - address : 127.0.0.1
+  - port : 5052
+server_camera:
+  - address : 127.0.0.1
+  - port : 5079
+cap_img_setting:
+  - offset : 20
+  - imgSize : 300
+path:
+  - model_h5 : Model/keras_model.h5
+  - model_txt : Model/labels.txt
+  - folder : Images/Left
